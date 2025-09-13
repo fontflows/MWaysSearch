@@ -3,7 +3,7 @@
 M-way Search Tree Implementation for Disk-Based Operations
 
 ## Authors
-- [Author 1 Name] - [USP Number]
+- Francisco Eduardo Fontenele - 15452569
 - [Author 2 Name] - [USP Number]
 
 ## Description
