@@ -1,0 +1,21 @@
+# Build directories
+build/
+cmake-build-debug/
+cmake-build-release/
+
+# Binary files
+*.bin
+*.exe
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated files
+print.txt
