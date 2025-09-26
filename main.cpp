@@ -3,7 +3,7 @@
  * @authors Francisco Eduardo Fontenele - 15452569
  *          Vinicius Botte - 15522900
  *
- * AED II - Trabalho 1 - Parte 1
+ * AED II - Trabalho 1 - Parte 2
  * Programa principal para teste de árvores de busca m-vias
  */
 
@@ -27,12 +27,11 @@ const vector<string> TEXT_FILES = {
  * @pre The binary file must be created and open
  * @post The search interface is executed until the user chooses to exit
  */
-void runSearchInterface(MWayTree& tree, const string& binFilename) {
+void runSearchInterface(MWayTree& tree) {
     int key;
     char continuar;
 
     do {
-        tree.displayTree(binFilename);
         cout << "Chave de busca: ";
         cin >> key;
 
@@ -87,7 +86,36 @@ int main() {
     cout << "Indice " << binFile << " aberto" << endl;
 
     // Run search interface
-    runSearchInterface(tree, binFile);
+    while(true){
+        tree.displayTree(binFile);
+
+        cout << "Selecione uma opcao:" << endl;
+        cout << "1. Buscar chave" << endl;
+        cout << "2. Inserir chave" << endl;
+        cout << "3. Sair" << endl;
+        cout << "Escolha (1-3): ";
+        cin >> choice;
+
+        if (choice < 1 || choice > 3) {
+            cerr << "Escolha invalida!" << endl;
+            return 1;
+        }
+
+        switch(choice){
+            case 1:
+                runSearchInterface(tree);
+                break;
+            case 2:
+                int key;
+
+                cout << "Chave de insercao: ";
+                cin >> key;
+                tree.insertB(key);
+                break;
+            case 3:
+                return 0;
+        }
+    }
     
     tree.closeBinary();
     return 0;

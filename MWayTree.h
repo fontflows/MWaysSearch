@@ -3,7 +3,7 @@
  * @authors Francisco Eduardo Fontenele - 15452569
  *          Vinicius Botte - 15522900
  *
- * AED II - Trabalho 1 - Parte 1
+ * AED II - Trabalho 1 - Parte 2
  * Declaração da classe MWayTree para árvore de busca m-vias
  */
 
@@ -18,8 +18,8 @@ const int M = 3; // Order of m-way tree
 
 struct Node {
     int n;                    // Number of keys
-    int keys[M - 1];          // Keys (fixed size: M-1)
-    int children[M];          // Child pointers (fixed size: M)
+    int keys[M];              // Keys (fixed size: M)
+    int children[M+1];        // Child pointers (fixed size: M+1)
 
     Node();
 };
@@ -31,6 +31,7 @@ private:
     int m;
 
     void writeNode(const Node& node, int position);
+    int writeNode(const Node& node);
     Node readNode(int position);
 
 public:
@@ -44,8 +45,15 @@ public:
 
     void displayTree(const std::string& binFilename) const;
 
+    int parent(int childNode, int key);
+
+    void createRoot(const Node& node);
+
     // mSearch algorithm implementation
     std::tuple<int, int, bool> mSearch(int key);
+
+    // insertB algorithm implementation
+    void insertB(int key);
 };
 
 #endif // MWAYTREE_H
