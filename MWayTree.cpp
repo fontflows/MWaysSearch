@@ -3,7 +3,7 @@
  * @authors Francisco Eduardo Fontenele - 15452569
  *          Vinicius Botte - 15522900
  *
- * AED II - Trabalho 1 - Parte 1
+ * AED II - Trabalho 1 - Parte 2
  * Implementação da classe MWayTree para árvore de busca m-vias
  */
 
@@ -13,6 +13,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cstring>
+#include <cmath>
 
 using namespace std;
 
@@ -36,6 +37,26 @@ void MWayTree::writeNode(const Node& node, int position) {
     file.seekp(position * sizeof(Node));
     file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
     file.flush();
+}
+
+/**
+ * @brief Writes a node to the binary file at EOF and returns the position where it was written
+ * @pre The binary file must be open for writing
+ * @post Returns the position where the node was written
+*/
+int MWayTree::writeNode(const Node& node){
+    int position = 0;
+
+    Node temp;
+    ifstream binFile("mvias.bin", ios::binary);
+
+    while(binFile.read(reinterpret_cast<char *>(&temp), sizeof(Node))){
+        position++;
+    }
+    file.seekp(position * sizeof(Node));
+    file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
+    file.flush();
+    return position;
 }
 
 /**
@@ -146,6 +167,63 @@ void MWayTree::displayTree(const string& binFilename) const {
 }
 
 /**
+ * @brief Returns the parent of a node
+ * @pre The child node and one of its keys are given as parameters
+ * @post The parent node is returned
+ */
+int MWayTree::parent(int childNode, int key){
+    int currentNode = root;
+    int parentNode = 0;
+
+    while (currentNode != childNode) {
+        Node node = readNode(currentNode);
+
+        int i = 0;
+        while (i < node.n && key > node.keys[i]) {
+            i++;
+        }
+
+        parentNode = currentNode;
+        currentNode = node.children[i];
+    }
+
+    return parentNode;
+}
+
+/**
+ * @brief Creates a new root given a node
+ * @pre The binary file must exist
+ * @post A new root is inserted into the tree
+*/
+void MWayTree::createRoot(const Node& node){
+    int position = -1;
+
+    Node temp;
+    ifstream binFile("mvias.bin", ios::binary);
+    if (!binFile.is_open()) return;
+
+    while(binFile.read(reinterpret_cast<char *>(&temp), sizeof(Node))){
+        position++;
+    }
+    while(position >= 0){
+        file.seekg(position * sizeof(Node));
+        file.read(reinterpret_cast<char*>(&temp), sizeof(Node));
+        for(int i = 0; i < m; i++){
+            if(temp.children[i] > 0){
+                temp.children[i]++;
+            }
+        }
+        file.seekp((position+1) * sizeof(Node));
+        file.write(reinterpret_cast<const char*>(&temp), sizeof(Node));
+        file.flush();
+        position--;
+    }
+    file.seekp(sizeof(Node));
+    file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
+    file.flush();
+}
+
+/**
  * @brief Searches for a key in the m-way tree
  * @pre The binary file must be open
  * @post Returns a tuple with (node, position, found) where:
@@ -180,4 +258,88 @@ tuple<int, int, bool> MWayTree::mSearch(int key) {
     }
 
     return make_tuple(0, 0, false);
+}
+
+/**
+ * @brief Inserts a key into the m-way tree
+ * @pre A key is given as parameter
+ * @post The key is inserted into the m-way tree
+ */
+void MWayTree::insertB(int key){
+    if (!file.is_open()){
+        return;
+    }
+
+    auto [node, pos, found] = mSearch(key);
+    if(found){
+        return;
+    }
+
+    int pNode = 0, qNode = 0;
+
+    while(node != 0){
+        Node newNode = readNode(node);
+
+        int i = 0;
+
+        while(i < newNode.n && key > newNode.keys[i]){
+            i++;
+        }
+
+        int j = newNode.n;
+        while(j >= i){
+            newNode.keys[j] = newNode.keys[j-1];
+            newNode.children[j+2] = newNode.children[j+1];
+            j--;
+        }
+
+        newNode.keys[i] = key;
+        if(pNode != 0){
+            newNode.children[i] = pNode;
+        }
+        if(qNode != 0){
+            newNode.children[i+1] = qNode;
+        }
+        newNode.n++;
+
+        if(newNode.n < m){
+            writeNode(newNode, node);
+            return;
+        }
+
+        Node p, q;
+        p.n = ceil(m/2.0) - 1;
+
+        int k = 0;
+        while(k <= p.n){
+            p.keys[k] = newNode.keys[k];
+            p.children[k] = newNode.children[k];
+            k++;
+        }
+
+        q.n = m - ceil(m/2.0);
+
+        k = 0;
+        while(k <= q.n){
+            q.keys[k] = newNode.keys[k + (int)ceil(m/2) + 1];
+            q.children[k] = newNode.children[k + (int)ceil(m/2) + 1];
+            k++;
+        }
+
+        writeNode(p, node);
+
+        pNode = node;
+        qNode = writeNode(q);
+
+        key = newNode.keys[(int)ceil(m/2.0) - 1];
+        node = parent(node, p.keys[0]);
+    }
+
+    // create new root
+    Node newRoot;
+    newRoot.n = 1;
+    newRoot.keys[0] = key;
+    newRoot.children[0] = pNode+1;
+    newRoot.children[1] = qNode+1;
+    createRoot(newRoot);
 }
