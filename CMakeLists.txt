@@ -16,3 +16,4 @@ configure_file(${CMAKE_SOURCE_DIR}/mvias.txt ${CMAKE_BINARY_DIR}/mvias.txt COPYO
 configure_file(${CMAKE_SOURCE_DIR}/mvias2.txt ${CMAKE_BINARY_DIR}/mvias2.txt COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/mvias3.txt ${CMAKE_BINARY_DIR}/mvias3.txt COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/mvias4.txt ${CMAKE_BINARY_DIR}/mvias4.txt COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/mvias5.txt ${CMAKE_BINARY_DIR}/mvias5.txt COPYONLY)

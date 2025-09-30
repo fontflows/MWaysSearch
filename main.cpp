@@ -1,16 +1,8 @@
-/**
- * @file main.cpp
- * @authors Francisco Eduardo Fontenele - 15452569
- *          Vinicius Botte - 15522900
- *
- * AED II - Trabalho 1 - Parte 2
- * Programa principal para teste de árvores de busca m-vias
- */
-
 #include "MWayTree.h"
 #include <iostream>
 #include <vector>
 #include <string>
+#include <filesystem>
 
 using namespace std;
 
@@ -19,7 +11,8 @@ const vector<string> TEXT_FILES = {
     "mvias.txt",    // Tree 1 with standard numbering
     "mvias2.txt",   // Tree 2 with standard numbering
     "mvias3.txt",   // Tree 1 with alternative numbering
-    "mvias4.txt"    // Tree 2 with alternative numbering
+    "mvias4.txt",   // Tree 2 with alternative numbering
+    "mvias5.txt"    // Tree 3 for m = 5
 };
 
 /**
@@ -36,7 +29,7 @@ void runSearchInterface(MWayTree& tree) {
         cin >> key;
 
         auto [node, pos, found] = tree.mSearch(key);
-        cout << key << " (" << node << "," << pos << "," << (found ? "true" : "false") << ")" << endl;
+        cout << " " << key << " (" << node << "," << pos << "," << (found ? "true" : "false") << ")" << endl;
 
         cout << "Continuar busca (s/n)? ";
         cin >> continuar;
@@ -56,26 +49,37 @@ int main() {
     cout << "2. Arvore 2 com numeracao padrao (mvias2.txt)" << endl;
     cout << "3. Arvore 1 com numeracao alternativa (mvias3.txt)" << endl;
     cout << "4. Arvore 2 com numeracao alternativa (mvias4.txt)" << endl;
-    cout << "Escolha (1-4): ";
+    cout << "5. Arvore 3 para ordem 5 (mvias5.txt)" << endl;
+    cout << "Escolha (1-5): ";
     cin >> choice;
 
-    if (choice < 1 || choice > 4) {
+    if (choice < 1 || choice > 5) {
         cerr << "Escolha invalida!" << endl;
         return 1;
     }
 
+    int order;
+    cout << "Informe a ordem m (3.." << MAX_M << "): ";
+    cin >> order;
+
     string textFile = TEXT_FILES[choice - 1];
     string binFile = "mvias.bin"; // Binary file name
 
-    cout << "Lendo dados de " << textFile << " e criando " << binFile << endl;
+    // Resolve and show absolute path to avoid picking a wrong file in the working directory
+    std::filesystem::path cwd = std::filesystem::current_path();
+    std::filesystem::path textPath = cwd / textFile;
 
-    // Create binary file from text file
-    if (!MWayTree::createFromText(textFile, binFile)) {
+    cout << "Lendo dados de " << textFile << " e criando " << binFile << endl;
+    cout << "Diretorio de trabalho: " << cwd.string() << endl;
+    cout << "Arquivo de texto (absoluto): " << textPath.string() << endl;
+
+    // Create binary file from text file (use absolute path to be explicit)
+    if (!MWayTree::createFromText(textPath.string(), binFile)) {
         cerr << "Error creating binary file from text file" << endl;
         return 1;
     }
 
-    MWayTree tree;
+    MWayTree tree(order);
 
     // Open binary file for operations
     if (!tree.openBinary(binFile)) {
@@ -85,7 +89,7 @@ int main() {
 
     cout << "Indice " << binFile << " aberto" << endl;
 
-    // Run search interface
+    // Run menu
     while(true){
         tree.displayTree(binFile);
 
@@ -105,18 +109,16 @@ int main() {
             case 1:
                 runSearchInterface(tree);
                 break;
-            case 2:
+            case 2: {
                 int key;
-
                 cout << "Chave de insercao: ";
                 cin >> key;
                 tree.insertB(key);
                 break;
+            }
             case 3:
+                tree.closeBinary();
                 return 0;
         }
     }
-    
-    tree.closeBinary();
-    return 0;
 }

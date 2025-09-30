@@ -14,12 +14,12 @@
 #include <string>
 #include <tuple>
 
-const int M = 3; // Order of m-way tree
+const int MAX_M = 32; // Max supported order for stable on-disk layout
 
 struct Node {
     int n;                    // Number of keys
-    int keys[M];              // Keys (fixed size: M)
-    int children[M+1];        // Child pointers (fixed size: M+1)
+    int keys[MAX_M];          // Keys (fixed maximum size)
+    int children[MAX_M+1];    // Child pointers (fixed maximum size)
 
     Node();
 };
@@ -27,6 +27,7 @@ struct Node {
 class MWayTree {
 private:
     std::fstream file;
+    std::string filename;
     int root;
     int m;
 
@@ -36,6 +37,7 @@ private:
 
 public:
     MWayTree();
+    MWayTree(int order);
     ~MWayTree();
 
     bool openBinary(const std::string& filename);
@@ -56,4 +58,4 @@ public:
     void insertB(int key);
 };
 
-#endif // MWAYTREE_H
+#endif

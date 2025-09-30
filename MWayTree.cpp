@@ -1,12 +1,3 @@
-/**
- * @file MWayTree.cpp
- * @authors Francisco Eduardo Fontenele - 15452569
- *          Vinicius Botte - 15522900
- *
- * AED II - Trabalho 1 - Parte 2
- * Implementação da classe MWayTree para árvore de busca m-vias
- */
-
 #include "MWayTree.h"
 #include <iostream>
 #include <fstream>
@@ -14,6 +5,7 @@
 #include <iomanip>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 
 using namespace std;
 
@@ -22,7 +14,14 @@ Node::Node() : n(0) {
     fill(begin(children), end(children), 0);
 }
 
-MWayTree::MWayTree() : root(1), m(M) {}
+MWayTree::MWayTree() : root(1), m(3) {}
+
+MWayTree::MWayTree(int order) : root(1) {
+    // clamp to valid on-disk fixed layout
+    if (order < 3) m = 3;
+    else if (order > MAX_M) m = MAX_M;
+    else m = order;
+}
 
 MWayTree::~MWayTree() {
     closeBinary();
@@ -34,7 +33,7 @@ MWayTree::~MWayTree() {
  * @post Node is written to the file at the specified position
  */
 void MWayTree::writeNode(const Node& node, int position) {
-    file.seekp(position * sizeof(Node));
+    file.seekp(static_cast<std::streamoff>(position) * sizeof(Node), ios::beg);
     file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
     file.flush();
 }
@@ -45,15 +44,9 @@ void MWayTree::writeNode(const Node& node, int position) {
  * @post Returns the position where the node was written
 */
 int MWayTree::writeNode(const Node& node){
-    int position = 0;
-
-    Node temp;
-    ifstream binFile("mvias.bin", ios::binary);
-
-    while(binFile.read(reinterpret_cast<char *>(&temp), sizeof(Node))){
-        position++;
-    }
-    file.seekp(position * sizeof(Node));
+    file.seekp(0, ios::end);
+    std::streampos endPos = file.tellp();
+    int position = static_cast<int>(endPos / static_cast<std::streampos>(sizeof(Node)));
     file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
     file.flush();
     return position;
@@ -65,8 +58,8 @@ int MWayTree::writeNode(const Node& node){
  * @post Returns the node read from the file
  */
 Node MWayTree::readNode(int position) {
-    Node node;
-    file.seekg(position * sizeof(Node));
+    Node node{};
+    file.seekg(static_cast<std::streamoff>(position) * sizeof(Node), ios::beg);
     file.read(reinterpret_cast<char*>(&node), sizeof(Node));
     return node;
 }
@@ -76,7 +69,8 @@ Node MWayTree::readNode(int position) {
  * @pre The binary file must exist
  * @post Returns true if the file was successfully opened
  */
-bool MWayTree::openBinary(const string& filename) {
+bool MWayTree::openBinary(const string& filename_) {
+    filename = filename_;
     file.open(filename, ios::in | ios::out | ios::binary);
     return file.is_open();
 }
@@ -115,7 +109,8 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
     binFile.write(reinterpret_cast<const char*>(&emptyNode), sizeof(Node));
 
     string line;
-    while (getline(textFile, line) && !line.empty()) {
+    while (getline(textFile, line)) {
+        if (line.empty()) continue;
         istringstream iss(line);
         Node node;
 
@@ -153,8 +148,7 @@ void MWayTree::displayTree(const string& binFilename) const {
 
     int nodeIndex = 1;
     while (binFile.read(reinterpret_cast<char*>(&node), sizeof(Node))) {
-        cout << nodeIndex << " " << node.n << ", " << node.children[0];
-
+        cout << setw(2) << nodeIndex << " " << node.n << ", " << node.children[0];
         for (int i = 0; i < node.n; i++) {
             cout << ",(" << setw(3) << node.keys[i] << ", " << node.children[i + 1] << ")";
         }
@@ -175,7 +169,7 @@ int MWayTree::parent(int childNode, int key){
     int currentNode = root;
     int parentNode = 0;
 
-    while (currentNode != childNode) {
+    while (currentNode != childNode && currentNode != 0) {
         Node node = readNode(currentNode);
 
         int i = 0;
@@ -196,31 +190,25 @@ int MWayTree::parent(int childNode, int key){
  * @post A new root is inserted into the tree
 */
 void MWayTree::createRoot(const Node& node){
-    int position = -1;
+    // compute current node count
+    file.flush();
+    file.seekg(0, ios::end);
+    std::streampos endPos = file.tellg();
+    int count = static_cast<int>(endPos / static_cast<std::streampos>(sizeof(Node)));
 
-    Node temp;
-    ifstream binFile("mvias.bin", ios::binary);
-    if (!binFile.is_open()) return;
-
-    while(binFile.read(reinterpret_cast<char *>(&temp), sizeof(Node))){
-        position++;
-    }
-    while(position >= 0){
-        file.seekg(position * sizeof(Node));
-        file.read(reinterpret_cast<char*>(&temp), sizeof(Node));
-        for(int i = 0; i < m; i++){
-            if(temp.children[i] > 0){
-                temp.children[i]++;
+    // shift all nodes (including header at 0) one position forward: i -> i+1
+    for (int position = count - 1; position >= 0; --position) {
+        Node temp = readNode(position);
+        for (int i = 0; i < MAX_M + 1; i++) {
+            if (temp.children[i] > 0) {
+                temp.children[i]++; // update child references due to shift
             }
         }
-        file.seekp((position+1) * sizeof(Node));
-        file.write(reinterpret_cast<const char*>(&temp), sizeof(Node));
-        file.flush();
-        position--;
+        writeNode(temp, position + 1);
     }
-    file.seekp(sizeof(Node));
-    file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
-    file.flush();
+
+    // write new root at position 1
+    writeNode(node, 1);
 }
 
 /**
@@ -247,11 +235,11 @@ tuple<int, int, bool> MWayTree::mSearch(int key) {
         }
 
         if (i < node.n && key == node.keys[i]) {
-            return make_tuple(currentNode, i + 1, true); // 1-based indexing
+            return make_tuple(currentNode, i + 1, true); // 1-based indexing on hit
         }
 
         if (node.children[i] == 0) {
-            return make_tuple(currentNode, i, false); // Position for insertion
+            return make_tuple(currentNode, i, false); // position for insertion (0..n)
         }
 
         currentNode = node.children[i];
@@ -280,66 +268,75 @@ void MWayTree::insertB(int key){
     while(node != 0){
         Node newNode = readNode(node);
 
+        // find insertion index
         int i = 0;
-
         while(i < newNode.n && key > newNode.keys[i]){
             i++;
         }
 
-        int j = newNode.n;
-        while(j >= i){
-            newNode.keys[j] = newNode.keys[j-1];
-            newNode.children[j+2] = newNode.children[j+1];
-            j--;
+        // shift keys to the right
+        for(int j = newNode.n - 1; j >= i; --j){
+            newNode.keys[j + 1] = newNode.keys[j];
+        }
+        // shift children to the right (for internal nodes)
+        for(int j = newNode.n; j >= i + 1; --j){
+            newNode.children[j + 1] = newNode.children[j];
         }
 
+        // place key and updated children (if any from a lower-level split)
         newNode.keys[i] = key;
         if(pNode != 0){
             newNode.children[i] = pNode;
         }
         if(qNode != 0){
-            newNode.children[i+1] = qNode;
+            newNode.children[i + 1] = qNode;
         }
         newNode.n++;
 
-        if(newNode.n < m){
+        // no overflow: write back and done
+        if(newNode.n <= m - 1){
             writeNode(newNode, node);
             return;
         }
 
-        Node p, q;
-        p.n = ceil(m/2.0) - 1;
+        // overflow: split node and promote median
+        const int mid = m / 2; // median index in 0-based array after temporary n==m
+        Node p{}, q{};
 
-        int k = 0;
-        while(k <= p.n){
+        // left node (p): 0..mid-1 keys, 0..mid children
+        p.n = mid;
+        for(int k = 0; k < p.n; ++k){
             p.keys[k] = newNode.keys[k];
+        }
+        for(int k = 0; k <= p.n; ++k){
             p.children[k] = newNode.children[k];
-            k++;
         }
 
-        q.n = m - ceil(m/2.0);
-
-        k = 0;
-        while(k <= q.n){
-            q.keys[k] = newNode.keys[k + (int)ceil(m/2) + 1];
-            q.children[k] = newNode.children[k + (int)ceil(m/2) + 1];
-            k++;
+        // right node (q): keys mid+1..newNode.n-1, children mid+1..newNode.n
+        int qKeys = newNode.n - mid - 1;
+        q.n = qKeys;
+        for(int k = 0; k < qKeys; ++k){
+            q.keys[k] = newNode.keys[mid + 1 + k];
+        }
+        for(int k = 0; k <= qKeys; ++k){
+            q.children[k] = newNode.children[mid + 1 + k];
         }
 
+        // write split nodes
         writeNode(p, node);
-
         pNode = node;
         qNode = writeNode(q);
 
-        key = newNode.keys[(int)ceil(m/2.0) - 1];
+        // promote median and go up
+        key = newNode.keys[mid];
         node = parent(node, p.keys[0]);
     }
 
-    // create new root
-    Node newRoot;
+    // create new root at level above, considering the file shift semantics
+    Node newRoot{};
     newRoot.n = 1;
     newRoot.keys[0] = key;
-    newRoot.children[0] = pNode+1;
-    newRoot.children[1] = qNode+1;
+    newRoot.children[0] = pNode + 1;
+    newRoot.children[1] = qNode + 1;
     createRoot(newRoot);
 }
