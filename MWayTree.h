@@ -1,10 +1,11 @@
 /**
 * @file MWayTree.h
- * @authors Francisco Eduardo Fontenele - 15452569
- *          Vinicius Botte - 15522900
+ * @authors
+ *   Francisco Eduardo Fontenele - 15452569
+ *   Vinicius Botte - 15522900
  *
  * AED II - Trabalho 1 - Parte 2
- * Declaração da classe MWayTree para árvore de busca m-vias
+ * Declaração da classe MWayTree para árvore B em disco
  */
 
 #ifndef MWAYTREE_H
@@ -13,6 +14,7 @@
 #include <fstream>
 #include <string>
 #include <tuple>
+#include <utility>
 
 const int MAX_M = 32; // Max supported order for stable on-disk layout
 
@@ -20,7 +22,6 @@ struct Node {
     int n;                    // Number of keys
     int keys[MAX_M];          // Keys (fixed maximum size)
     int children[MAX_M+1];    // Child pointers (fixed maximum size)
-
     Node();
 };
 
@@ -31,19 +32,31 @@ private:
     int root;
     int m;
 
+    // I/O counters for the index file (reset per operation)
+    long long idxReads = 0;
+    long long idxWrites = 0;
+
     void writeNode(const Node& node, int position);
     int writeNode(const Node& node);
     Node readNode(int position);
 
+    // Header helpers
+    void updateHeader();                 // write header with n=-1, keys[0]=m, children[0]=root
+    bool loadAndValidateHeader();        // read and validate header (m); init if missing
+
 public:
     MWayTree();
-    MWayTree(int order);
+    explicit MWayTree(int order);
     ~MWayTree();
 
     bool openBinary(const std::string& filename);
     void closeBinary();
 
-    static bool createFromText(const std::string& textFilename, const std::string& binFilename);
+    // Creates binary index from text, writing header with provided order (m)
+    static bool createFromText(const std::string& textFilename, const std::string& binFilename, int order);
+
+    // Export binary index back to text file (sequential nodes 1..N)
+    bool exportToText(const std::string& textFilename) const;
 
     void displayTree(const std::string& binFilename) const;
 
@@ -51,11 +64,15 @@ public:
 
     void createRoot(const Node& node);
 
-    // mSearch algorithm implementation
+    // mSearch algorithm
     std::tuple<int, int, bool> mSearch(int key);
 
-    // insertB algorithm implementation
+    // insertB algorithm
     void insertB(int key);
+
+    // Counters API
+    void resetCounters();
+    std::pair<long long,long long> getCounters() const;
 };
 
 #endif

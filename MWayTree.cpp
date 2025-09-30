@@ -3,8 +3,6 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
-#include <cstring>
-#include <cmath>
 #include <algorithm>
 
 using namespace std;
@@ -14,10 +12,9 @@ Node::Node() : n(0) {
     fill(begin(children), end(children), 0);
 }
 
-MWayTree::MWayTree() : root(1), m(3) {}
+MWayTree::MWayTree() : file(), filename(), root(1), m(3) {}
 
-MWayTree::MWayTree(int order) : root(1) {
-    // clamp to valid on-disk fixed layout
+MWayTree::MWayTree(int order) : file(), filename(), root(1) {
     if (order < 3) m = 3;
     else if (order > MAX_M) m = MAX_M;
     else m = order;
@@ -27,21 +24,27 @@ MWayTree::~MWayTree() {
     closeBinary();
 }
 
+void MWayTree::resetCounters() {
+    idxReads = 0;
+    idxWrites = 0;
+}
+
+pair<long long,long long> MWayTree::getCounters() const {
+    return {idxReads, idxWrites};
+}
+
 /**
  * @brief Writes a node to the binary file at the specified position
- * @pre The binary file must be open for writing
- * @post Node is written to the file at the specified position
  */
 void MWayTree::writeNode(const Node& node, int position) {
     file.seekp(static_cast<std::streamoff>(position) * sizeof(Node), ios::beg);
     file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
     file.flush();
+    idxWrites++;
 }
 
 /**
  * @brief Writes a node to the binary file at EOF and returns the position where it was written
- * @pre The binary file must be open for writing
- * @post Returns the position where the node was written
 */
 int MWayTree::writeNode(const Node& node){
     file.seekp(0, ios::end);
@@ -49,49 +52,85 @@ int MWayTree::writeNode(const Node& node){
     int position = static_cast<int>(endPos / static_cast<std::streampos>(sizeof(Node)));
     file.write(reinterpret_cast<const char*>(&node), sizeof(Node));
     file.flush();
+    idxWrites++;
     return position;
 }
 
 /**
  * @brief Reads a node from the binary file at the specified position
- * @pre The binary file must be open for reading
- * @post Returns the node read from the file
  */
 Node MWayTree::readNode(int position) {
     Node node{};
     file.seekg(static_cast<std::streamoff>(position) * sizeof(Node), ios::beg);
     file.read(reinterpret_cast<char*>(&node), sizeof(Node));
+    idxReads++;
     return node;
 }
 
-/**
- * @brief Opens the binary file for operations
- * @pre The binary file must exist
- * @post Returns true if the file was successfully opened
- */
 bool MWayTree::openBinary(const string& filename_) {
     filename = filename_;
     file.open(filename, ios::in | ios::out | ios::binary);
-    return file.is_open();
+    if (!file.is_open()) return false;
+    // Validate or initialize header
+    if (!loadAndValidateHeader()) {
+        file.close();
+        return false;
+    }
+    return true;
 }
 
-/**
- * @brief Closes the binary file
- * @pre None
- * @post The binary file is closed if it was open
- */
 void MWayTree::closeBinary() {
     if (file.is_open()) {
+        // Persist header (m, root)
+        updateHeader();
         file.close();
     }
 }
 
 /**
- * @brief Creates a binary file from a text file
- * @pre The text file must exist and be properly formatted
- * @post Returns true if the binary file was successfully created
+ * @brief Header layout: Node at position 0 with n=-1 sentinel
+ * keys[0] = m, children[0] = root
  */
-bool MWayTree::createFromText(const string& textFilename, const string& binFilename) {
+void MWayTree::updateHeader() {
+    if (!file.is_open()) return;
+    Node hdr{};
+    hdr.n = -1;
+    hdr.keys[0] = m;
+    hdr.children[0] = root;
+    // direct seek/write without counting (header meta)
+    file.seekp(0, ios::beg);
+    file.write(reinterpret_cast<const char*>(&hdr), sizeof(Node));
+    file.flush();
+}
+
+bool MWayTree::loadAndValidateHeader() {
+    if (!file.is_open()) return false;
+    // read header
+    Node hdr{};
+    file.seekg(0, ios::beg);
+    file.read(reinterpret_cast<char*>(&hdr), sizeof(Node));
+    // If header is present, validate; else initialize
+    if (hdr.n == -1) {
+        int fileM = hdr.keys[0];
+        int fileRoot = hdr.children[0];
+        if (fileM != m) {
+            cerr << "Error: index built with m=" << fileM << " but runtime m=" << m << endl;
+            return false;
+        }
+        if (fileRoot > 0) root = fileRoot;
+        return true;
+    } else {
+        // Initialize header with current m and root=1 (legacy file)
+        root = 1;
+        updateHeader();
+        return true;
+    }
+}
+
+/**
+ * @brief Creates a binary file from a text file. Writes header with order (m).
+ */
+bool MWayTree::createFromText(const string& textFilename, const string& binFilename, int order) {
     ifstream textFile(textFilename);
     if (!textFile.is_open()) {
         cerr << "Error: Cannot open " << textFilename << endl;
@@ -105,8 +144,12 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
         return false;
     }
 
-    Node emptyNode;
-    binFile.write(reinterpret_cast<const char*>(&emptyNode), sizeof(Node));
+    // Header block (sentinel)
+    Node hdr{};
+    hdr.n = -1;
+    hdr.keys[0] = (order < 3 ? 3 : (order > MAX_M ? MAX_M : order));
+    hdr.children[0] = 1; // root at 1 initially
+    binFile.write(reinterpret_cast<const char*>(&hdr), sizeof(Node));
 
     string line;
     while (getline(textFile, line)) {
@@ -130,9 +173,37 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
 }
 
 /**
+ * @brief Export the binary index to a text file (same format used in input)
+ */
+bool MWayTree::exportToText(const std::string& textFilename) const {
+    ifstream binFile(filename, ios::binary);
+    if (!binFile.is_open()) return false;
+
+    ofstream txt(textFilename, ios::trunc);
+    if (!txt.is_open()) {
+        binFile.close();
+        return false;
+    }
+
+    Node node;
+    // skip header
+    binFile.read(reinterpret_cast<char*>(&node), sizeof(Node));
+
+    while (binFile.read(reinterpret_cast<char*>(&node), sizeof(Node))) {
+        txt << node.n << " " << node.children[0];
+        for (int i = 0; i < node.n; ++i) {
+            txt << " " << node.keys[i] << " " << node.children[i + 1];
+        }
+        txt << "\n";
+    }
+
+    binFile.close();
+    txt.close();
+    return true;
+}
+
+/**
  * @brief Displays the tree structure from the binary file
- * @pre The binary file must exist
- * @post The tree structure is printed to standard output
  */
 void MWayTree::displayTree(const string& binFilename) const {
     cout << "T = " << root << ", m = " << m << endl;
@@ -144,7 +215,7 @@ void MWayTree::displayTree(const string& binFilename) const {
     if (!binFile.is_open()) return;
 
     Node node;
-    binFile.read(reinterpret_cast<char*>(&node), sizeof(Node)); // Skip position 0
+    binFile.read(reinterpret_cast<char*>(&node), sizeof(Node)); // Skip header
 
     int nodeIndex = 1;
     while (binFile.read(reinterpret_cast<char*>(&node), sizeof(Node))) {
@@ -161,9 +232,7 @@ void MWayTree::displayTree(const string& binFilename) const {
 }
 
 /**
- * @brief Returns the parent of a node
- * @pre The child node and one of its keys are given as parameters
- * @post The parent node is returned
+ * @brief Returns the parent of a node (by top-down traversal)
  */
 int MWayTree::parent(int childNode, int key){
     int currentNode = root;
@@ -185,19 +254,17 @@ int MWayTree::parent(int childNode, int key){
 }
 
 /**
- * @brief Creates a new root given a node
- * @pre The binary file must exist
- * @post A new root is inserted into the tree
-*/
+ * @brief Creates a new root given a node.
+ * Shifts only nodes >= 1 one position forward (header at 0 is not moved).
+ */
 void MWayTree::createRoot(const Node& node){
-    // compute current node count
     file.flush();
     file.seekg(0, ios::end);
     std::streampos endPos = file.tellg();
     int count = static_cast<int>(endPos / static_cast<std::streampos>(sizeof(Node)));
 
-    // shift all nodes (including header at 0) one position forward: i -> i+1
-    for (int position = count - 1; position >= 0; --position) {
+    // shift nodes 1..count-1 -> 2..count (do not move header at 0)
+    for (int position = count - 1; position >= 1; --position) {
         Node temp = readNode(position);
         for (int i = 0; i < MAX_M + 1; i++) {
             if (temp.children[i] > 0) {
@@ -209,20 +276,20 @@ void MWayTree::createRoot(const Node& node){
 
     // write new root at position 1
     writeNode(node, 1);
+    root = 1;
+    updateHeader();
 }
 
 /**
  * @brief Searches for a key in the m-way tree
- * @pre The binary file must be open
- * @post Returns a tuple with (node, position, found) where:
- *        - node: the node where the key was found or should be inserted
- *        - position: the position in the node
- *        - found: true if the key was found, false otherwise
+ * Returns (node, position, found). position: 1-based only when found; else 0..n (slot).
  */
 tuple<int, int, bool> MWayTree::mSearch(int key) {
     if (!file.is_open()) {
         return make_tuple(0, 0, false);
     }
+
+    resetCounters();
 
     int currentNode = root;
 
@@ -235,11 +302,11 @@ tuple<int, int, bool> MWayTree::mSearch(int key) {
         }
 
         if (i < node.n && key == node.keys[i]) {
-            return make_tuple(currentNode, i + 1, true); // 1-based indexing on hit
+            return make_tuple(currentNode, i + 1, true); // 1-based on hit
         }
 
         if (node.children[i] == 0) {
-            return make_tuple(currentNode, i, false); // position for insertion (0..n)
+            return make_tuple(currentNode, i, false); // insertion slot (0..n)
         }
 
         currentNode = node.children[i];
@@ -249,16 +316,17 @@ tuple<int, int, bool> MWayTree::mSearch(int key) {
 }
 
 /**
- * @brief Inserts a key into the m-way tree
- * @pre A key is given as parameter
- * @post The key is inserted into the m-way tree
+ * @brief Inserts a key into the m-way tree (bottom-up with split)
  */
 void MWayTree::insertB(int key){
     if (!file.is_open()){
         return;
     }
 
+    resetCounters();
+
     auto [node, pos, found] = mSearch(key);
+    // mSearch already reset counters; keep cumulative for insert path
     if(found){
         return;
     }
@@ -329,7 +397,9 @@ void MWayTree::insertB(int key){
 
         // promote median and go up
         key = newNode.keys[mid];
-        node = parent(node, p.keys[0]);
+        // find parent by routing using a key from left node
+        int probeKey = (p.n > 0) ? p.keys[0] : key;
+        node = parent(node, probeKey);
     }
 
     // create new root at level above, considering the file shift semantics

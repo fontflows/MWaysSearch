@@ -9,10 +9,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
-add_executable(MWaysSearch main.cpp MWayTree.cpp)
+add_executable(MWaysSearch
+        main.cpp
+        MWayTree.cpp
+        DataFile.cpp
+)
 
 # Copy test files to build directory
-configure_file(${CMAKE_SOURCE_DIR}/mvias.txt ${CMAKE_BINARY_DIR}/mvias.txt COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/mvias.txt  ${CMAKE_BINARY_DIR}/mvias.txt  COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/mvias2.txt ${CMAKE_BINARY_DIR}/mvias2.txt COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/mvias3.txt ${CMAKE_BINARY_DIR}/mvias3.txt COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/mvias4.txt ${CMAKE_BINARY_DIR}/mvias4.txt COPYONLY)
