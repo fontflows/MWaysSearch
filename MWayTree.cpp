@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <stack>
 
 using namespace std;
 
@@ -232,28 +233,6 @@ void MWayTree::displayTree(const string& binFilename) const {
 }
 
 /**
- * @brief Returns the parent of a node (by top-down traversal)
- */
-int MWayTree::parent(int childNode, int key){
-    int currentNode = root;
-    int parentNode = 0;
-
-    while (currentNode != childNode && currentNode != 0) {
-        Node node = readNode(currentNode);
-
-        int i = 0;
-        while (i < node.n && key > node.keys[i]) {
-            i++;
-        }
-
-        parentNode = currentNode;
-        currentNode = node.children[i];
-    }
-
-    return parentNode;
-}
-
-/**
  * @brief Creates a new root given a node.
  * Shifts only nodes >= 1 one position forward (header at 0 is not moved).
  */
@@ -284,7 +263,7 @@ void MWayTree::createRoot(const Node& node){
  * @brief Searches for a key in the m-way tree
  * Returns (node, position, found). position: 1-based only when found; else 0..n (slot).
  */
-tuple<int, int, bool> MWayTree::mSearch(int key) {
+tuple<int, int, bool> MWayTree::mSearch(int key, stack<int>* branch) {
     if (!file.is_open()) {
         return make_tuple(0, 0, false);
     }
@@ -292,6 +271,9 @@ tuple<int, int, bool> MWayTree::mSearch(int key) {
     resetCounters();
 
     int currentNode = root;
+    if(branch){
+        branch->push(currentNode);
+    }
 
     while (currentNode != 0) {
         Node node = readNode(currentNode);
@@ -310,6 +292,9 @@ tuple<int, int, bool> MWayTree::mSearch(int key) {
         }
 
         currentNode = node.children[i];
+        if(branch){
+            branch->push(currentNode);
+        }
     }
 
     return make_tuple(0, 0, false);
@@ -325,7 +310,10 @@ void MWayTree::insertB(int key){
 
     resetCounters();
 
-    auto [node, pos, found] = mSearch(key);
+    // current branch
+    stack<int> branch;
+    branch.push(0);
+    auto [node, pos, found] = mSearch(key, &branch);
     // mSearch already reset counters; keep cumulative for insert path
     if(found){
         return;
@@ -397,9 +385,9 @@ void MWayTree::insertB(int key){
 
         // promote median and go up
         key = newNode.keys[mid];
-        // find parent by routing using a key from left node
-        int probeKey = (p.n > 0) ? p.keys[0] : key;
-        node = parent(node, probeKey);
+        // get parent node from branch
+        branch.pop();
+        node = branch.top();
     }
 
     // create new root at level above, considering the file shift semantics
