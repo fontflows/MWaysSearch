@@ -15,6 +15,9 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <stack>
+
+using namespace std;
 
 const int MAX_M = 32; // Max supported order for stable on-disk layout
 
@@ -60,12 +63,10 @@ public:
 
     void displayTree(const std::string& binFilename) const;
 
-    int parent(int childNode, int key);
-
     void createRoot(const Node& node);
 
     // mSearch algorithm
-    std::tuple<int, int, bool> mSearch(int key);
+    std::tuple<int, int, bool> mSearch(int key, stack<int>* branch = nullptr);
 
     // insertB algorithm
     void insertB(int key);
