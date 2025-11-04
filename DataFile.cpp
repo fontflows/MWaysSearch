@@ -15,10 +15,18 @@
 
 using namespace std;
 
+/**
+ * @brief Destrutor: fecha o arquivo se ainda aberto.
+ */
 DataFile::~DataFile() {
     close();
 }
 
+/**
+ * @brief Abre (ou cria) o arquivo binário de dados.
+ * @param fname Caminho do arquivo.
+ * @return true se aberto com sucesso.
+ */
 bool DataFile::open(const std::string& fname) {
     filename = fname;
     file.open(filename, ios::in | ios::out | ios::binary);
@@ -32,12 +40,18 @@ bool DataFile::open(const std::string& fname) {
     return file.is_open();
 }
 
+/**
+ * @brief Fecha o arquivo binário se aberto.
+ */
 void DataFile::close() {
     if (file.is_open()) file.close();
 }
 
 /**
- * @brief Cria o arquivo principal a partir do .txt da árvore
+ * @brief Constrói data.bin a partir de um .txt de nós (gera 1 registro por chave).
+ * @param textFilename Caminho do .txt (linhas: "n A0 K1 A1 ... Kn An").
+ * @param dataFilename Caminho do data.bin de saída (sobrescrito).
+ * @return true se criado com sucesso; false ao detectar formato inválido.
  */
 bool DataFile::createFromText(const std::string& textFilename, const std::string& dataFilename) {
     ifstream txt(textFilename);
@@ -84,7 +98,12 @@ bool DataFile::createFromText(const std::string& textFilename, const std::string
     return true;
 }
 
-// Novo
+/**
+ * @brief Constrói data.bin a partir de employees.txt no formato "id;Nome;Depto".
+ * @param employeesTxt Caminho do arquivo texto de entrada.
+ * @param dataFilename Caminho do data.bin de saída (sobrescrito).
+ * @return true se criado; false se houver linhas inválidas ou falha de I/O.
+ */
 bool DataFile::createFromEmployees(const std::string& employeesTxt, const std::string& dataFilename) {
     ifstream in(employeesTxt);
     if (!in.is_open()) return false;
@@ -103,11 +122,9 @@ bool DataFile::createFromEmployees(const std::string& employeesTxt, const std::s
         for (char c : line) { if (!std::isspace(static_cast<unsigned char>(c))) { onlySpace = false; break; } }
         if (onlySpace) continue;
 
-        // Formato esperado: id;Nome;Depto
         int id = 0;
         string nome, depto;
 
-        // parsing manual por ';'
         size_t p1 = line.find(';');
         size_t p2 = (p1 == string::npos) ? string::npos : line.find(';', p1 + 1);
         if (p1 == string::npos || p2 == string::npos) {
@@ -125,7 +142,6 @@ bool DataFile::createFromEmployees(const std::string& employeesTxt, const std::s
         nome = line.substr(p1 + 1, p2 - (p1 + 1));
         depto = line.substr(p2 + 1);
 
-        // trim simples
         auto trim = [](string& s){
             size_t a = s.find_first_not_of(" \t\r\n");
             size_t b = s.find_last_not_of(" \t\r\n");
@@ -137,7 +153,6 @@ bool DataFile::createFromEmployees(const std::string& employeesTxt, const std::s
         Record r{};
         r.key = id;
         r.active = 1;
-        // payload curto para caber em 64 bytes
         string payload = "Funcionario " + to_string(id) + " | " + nome + " | " + depto;
         if (payload.size() >= sizeof(r.payload)) {
             payload.resize(sizeof(r.payload) - 1);
@@ -153,7 +168,10 @@ bool DataFile::createFromEmployees(const std::string& employeesTxt, const std::s
 }
 
 /**
- * @brief Busca sequencial por chave (apenas ativos)
+ * @brief Busca sequencial por chave (apenas registros active=1).
+ * @param key Chave a procurar.
+ * @param out Registro de saída, se encontrado.
+ * @return true se encontrado (O(n)); counters são atualizados.
  */
 bool DataFile::find(int key, Record& out) {
     if (!file.is_open()) return false;
@@ -172,7 +190,9 @@ bool DataFile::find(int key, Record& out) {
 }
 
 /**
- * @brief Insere no final (active=1)
+ * @brief Insere um registro ativo ao final do arquivo (append).
+ * @param rec Registro de entrada; active será definido como 1.
+ * @return true se escrita OK; counters são atualizados.
  */
 bool DataFile::insert(const Record& rec) {
     if (!file.is_open()) return false;
@@ -188,7 +208,9 @@ bool DataFile::insert(const Record& rec) {
 }
 
 /**
- * @brief Marca como removido o primeiro registro ativo com a chave
+ * @brief Marca como removido (active=0) o primeiro registro ativo com a chave.
+ * @param key Chave a remover.
+ * @return true se encontrou e marcou; counters são atualizados.
  */
 bool DataFile::remove(int key) {
     if (!file.is_open()) return false;
@@ -215,7 +237,7 @@ bool DataFile::remove(int key) {
 }
 
 /**
- * @brief Imprime todos os registros
+ * @brief Imprime todos os registros (ativos e removidos) para depuração.
  */
 void DataFile::printAll() {
     if (!file.is_open()) return;
@@ -229,7 +251,11 @@ void DataFile::printAll() {
     cout << "------------------------------------------------" << endl;
 }
 
-// Novo
+/**
+ * @brief Lê todas as chaves com active=1 e devolve em outKeys.
+ * @param outKeys Vetor de saída com as chaves ativas.
+ * @return true se leitura executada; counters não são alterados.
+ */
 bool DataFile::listActiveKeys(std::vector<int>& outKeys) {
     if (!file.is_open()) return false;
     file.clear();
@@ -242,11 +268,18 @@ bool DataFile::listActiveKeys(std::vector<int>& outKeys) {
     return true;
 }
 
+/**
+ * @brief Zera contadores de I/O da última operação.
+ */
 void DataFile::resetCounters() {
     reads = 0;
     writes = 0;
 }
 
+/**
+ * @brief Retorna os contadores de I/O acumulados desde o último reset.
+ * @return Par (reads, writes).
+ */
 pair<long long,long long> DataFile::getCounters() const {
     return {reads, writes};
 }

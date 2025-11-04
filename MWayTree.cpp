@@ -50,7 +50,9 @@ pair<long long,long long> MWayTree::getCounters() const {
 }
 
 /**
- * @brief Escreve nó na posição
+ * @brief Persiste o nó na posição lógica informada (>=1).
+ * @param node Nó a gravar.
+ * @param position Posição lógica (1..N).
  */
 void MWayTree::writeNode(const Node& node, int position) {
     file.seekp(static_cast<std::streamoff>(position) * sizeof(Node), ios::beg);
@@ -60,7 +62,9 @@ void MWayTree::writeNode(const Node& node, int position) {
 }
 
 /**
- * @brief Escreve nó no EOF e retorna a posição
+ * @brief Persiste o nó ao final do arquivo (após o último nó).
+ * @param node Nó a gravar.
+ * @return Posição lógica (1..N) atribuída ao nó.
 */
 int MWayTree::writeNode(const Node& node){
     file.seekp(0, ios::end);
@@ -73,7 +77,9 @@ int MWayTree::writeNode(const Node& node){
 }
 
 /**
- * @brief Lê nó na posição
+ * @brief Carrega o nó na posição lógica indicada.
+ * @param position Posição lógica (1..N).
+ * @return Nó carregado da mídia.
  */
 Node MWayTree::readNode(int position) {
     Node node{};
@@ -84,7 +90,7 @@ Node MWayTree::readNode(int position) {
 }
 
 /**
- * @brief Escreve header (n=-1, keys[0]=m, children[0]=root)
+ * @brief Atualiza o header com m e root atuais.
  */
 void MWayTree::updateHeader() {
     if (!file.is_open()) return;
@@ -98,7 +104,8 @@ void MWayTree::updateHeader() {
 }
 
 /**
- * @brief Carrega header e valida ordem (FIXED_ORDER_M quando definido)
+ * @brief Lê e valida o header do arquivo aberto.
+ * @return true se header válido (n=-1, 3<=m<=MAX_M).
  */
 bool MWayTree::loadAndValidateHeader() {
     if (!file.is_open()) return false;
@@ -114,6 +121,11 @@ bool MWayTree::loadAndValidateHeader() {
     return true;
 }
 
+/**
+ * @brief Abre o arquivo binário do índice e valida header.
+ * @param filename_ Caminho do arquivo.
+ * @return true se aberto e válido.
+ */
 bool MWayTree::openBinary(const string& filename_) {
     filename = filename_;
     file.open(filename, ios::in | ios::out | ios::binary);
@@ -125,6 +137,9 @@ bool MWayTree::openBinary(const string& filename_) {
     return true;
 }
 
+/**
+ * @brief Fecha o arquivo e persiste o header.
+ */
 void MWayTree::closeBinary() {
     if (file.is_open()) {
         updateHeader();
@@ -133,7 +148,11 @@ void MWayTree::closeBinary() {
 }
 
 /**
- * @brief Cria binário a partir de texto (validação completa)
+ * @brief Cria binário a partir de texto com validações (ordem, filhos, alcance).
+ * @param textFilename Caminho do .txt de entrada.
+ * @param binFilename Caminho do .bin de saída.
+ * @param order Ordem m desejada (ajustada para [3..MAX_M]).
+ * @return true se criado com sucesso.
  */
 bool MWayTree::createFromText(const string& textFilename, const string& binFilename, int order) {
     int effOrder = (order < 3 ? 3 : (order > MAX_M ? MAX_M : order));
@@ -141,7 +160,6 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
     ifstream textFile(textFilename);
     if (!textFile.is_open()) return false;
 
-    // Parse e validação em memória
     struct Parsed {
         int n{};
         int a0{};
@@ -155,7 +173,6 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
     int lineNo = 0;
     while (getline(textFile, line)) {
         ++lineNo;
-        // ignorar linhas vazias ou só espaços
         bool onlySpace = true;
         for (char c : line) { if (!std::isspace(static_cast<unsigned char>(c))) { onlySpace = false; break; } }
         if (onlySpace) continue;
@@ -187,7 +204,6 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
             p.keys[i] = k;
             p.children[i + 1] = ai;
         }
-        // Não permitir tokens extras não-numéricos
         int extraProbe;
         if (iss >> extraProbe) {
             cerr << "Tokens extras apos Kn/An na linha " << lineNo << "." << endl;
@@ -198,10 +214,8 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
     }
     textFile.close();
 
-    // Validação de intervalo de filhos e alcançabilidade
     const int N = static_cast<int>(nodes.size());
     if (N == 0) {
-        // cria só header com raiz vazia
         ofstream empty(binFilename, ios::binary | ios::trunc);
         if (!empty.is_open()) return false;
         Node hdr{};
@@ -226,7 +240,6 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
         }
     }
 
-    // Alcance a partir da raiz (primeira linha => pos=1)
     vector<char> vis(N + 1, 0);
     queue<int> q;
     q.push(1); vis[1] = 1;
@@ -245,14 +258,13 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
         }
     }
 
-    // Escrita binária após validar tudo
     ofstream binFile(binFilename, ios::binary | ios::trunc);
     if (!binFile.is_open()) return false;
 
     Node hdr{};
     hdr.n = -1;
     hdr.keys[0] = effOrder;
-    hdr.children[0] = 1; // raiz é o primeiro nó do .txt
+    hdr.children[0] = 1;
     binFile.write(reinterpret_cast<const char*>(&hdr), sizeof(Node));
 
     for (int pos = 1; pos <= N; ++pos) {
@@ -268,7 +280,10 @@ bool MWayTree::createFromText(const string& textFilename, const string& binFilen
 }
 
 /**
- * @brief Cria índice vazio com header
+ * @brief Cria índice vazio com header e root=0.
+ * @param binFilename Caminho do .bin de saída.
+ * @param order Ordem m desejada (ajustada para [3..MAX_M]).
+ * @return true em caso de sucesso.
  */
 bool MWayTree::createEmpty(const std::string& binFilename, int order) {
     int ord = (order < 3 ? 3 : (order > MAX_M ? MAX_M : order));
@@ -285,7 +300,11 @@ bool MWayTree::createEmpty(const std::string& binFilename, int order) {
 }
 
 /**
- * @brief Lê header sem manter arquivo aberto
+ * @brief Lê header sem manter arquivo aberto.
+ * @param binFilename Caminho do .bin.
+ * @param outM Saída: ordem m.
+ * @param outRoot Saída: posição da raiz.
+ * @return true se header válido.
  */
 bool MWayTree::readHeader(const std::string& binFilename, int& outM, int& outRoot) {
     ifstream in(binFilename, ios::binary);
@@ -300,7 +319,9 @@ bool MWayTree::readHeader(const std::string& binFilename, int& outM, int& outRoo
 }
 
 /**
- * @brief Exporta índice para .txt
+ * @brief Exporta índice para .txt (exclui o header).
+ * @param textFilename Caminho do .txt de saída.
+ * @return true em caso de sucesso.
  */
 bool MWayTree::exportToText(const std::string& textFilename) const {
     ifstream binFile(filename, ios::binary);
@@ -328,7 +349,8 @@ bool MWayTree::exportToText(const std::string& textFilename) const {
 }
 
 /**
- * @brief Exibe apenas nós alcançáveis a partir da raiz
+ * @brief Exibe nós alcançáveis a partir da raiz (BFS) em formato legível.
+ * @param binFilename Caminho do .bin (leitura independente).
  */
 void MWayTree::displayTree(const string& binFilename) const {
     cout << "T = " << root << ", m = " << m << endl;
@@ -381,7 +403,8 @@ void MWayTree::displayTree(const string& binFilename) const {
 }
 
 /**
- * @brief Cria raiz em árvore vazia
+ * @brief Cria a raiz em árvore vazia e persiste no arquivo.
+ * @param node Nó a persistir como raiz.
  */
 void MWayTree::createRoot(const Node& node){
     int pos = writeNode(node);
@@ -390,7 +413,11 @@ void MWayTree::createRoot(const Node& node){
 }
 
 /**
- * @brief Busca mSearch
+ * @brief Busca mSearch: desce a árvore comparando chaves até encontrar ou determinar posição.
+ * @param key Chave a buscar.
+ * @param branch (Opcional) pilha com as posições dos nós visitados (topo = último visitado).
+ * @return (nodePos, slot, found): se found=true, slot é 1-based do vetor keys;
+ *         se found=false, slot é o índice do ponteiro de filho a seguir (e posição de inserção).
  */
 tuple<int, int, bool> MWayTree::mSearch(int key, stack<int>* branch) {
     if (!file.is_open() || root == 0) return make_tuple(0, 0, false);
@@ -422,7 +449,8 @@ tuple<int, int, bool> MWayTree::mSearch(int key, stack<int>* branch) {
 }
 
 /**
- * @brief Inserção bottom-up com splits
+ * @brief Inserção bottom-up: insere em folha; se nó ficar cheio (n>=m), divide e promove chave central.
+ * @param key Chave a inserir; duplicatas são ignoradas.
  */
 void MWayTree::insertB(int key){
     if (!file.is_open()) return;
@@ -437,7 +465,6 @@ void MWayTree::insertB(int key){
         return;
     }
 
-    // Caminho
     vector<int> path;
     int cur = root;
     while (true) {
@@ -450,7 +477,6 @@ void MWayTree::insertB(int key){
         if (i < node.n && key == node.keys[i]) return;
 
         if (node.children[i] == 0) {
-            // inserir aqui
             for (int j = node.n; j > i; --j) node.keys[j] = node.keys[j - 1];
             for (int j = node.n + 1; j > i; --j) node.children[j] = node.children[j - 1];
             node.keys[i] = key;
@@ -458,7 +484,6 @@ void MWayTree::insertB(int key){
             node.n++;
             writeNode(node, cur);
 
-            // propagar splits
             int upKey = 0;
             int rightPos = 0;
             while (node.n >= m) {
@@ -526,7 +551,11 @@ bool MWayTree::isLeaf(const Node& node) const {
 }
 
 /**
- * @brief Corrige underflow do filho em childIndex
+ * @brief Corrige underflow do filho childIndex de parentPos.
+ * @param parentPos Posição do pai.
+ * @param childIndex Índice do filho [0..n].
+ * @details Estratégia: (1) tentar empréstimo do irmão esquerdo/direito com >minKeys;
+ *          (2) caso contrário, fundir com irmão adjacente e puxar chave do pai.
  */
 void MWayTree::fixUnderflow(int parentPos, int childIndex) {
     Node parent = readNode(parentPos);
@@ -628,7 +657,10 @@ void MWayTree::fixUnderflow(int parentPos, int childIndex) {
 }
 
 /**
- * @brief Deleção recursiva
+ * @brief Remoção recursiva com substituto por antecessor em nós internos.
+ * @param nodePos Posição atual.
+ * @param key Chave a remover.
+ * @return Ok/Underflow/NotFound conforme progresso; underflow propagará ajuste ao retorno.
  */
 MWayTree::DelResult MWayTree::deleteRecursive(int nodePos, int key) {
     Node node = readNode(nodePos);
@@ -680,7 +712,9 @@ MWayTree::DelResult MWayTree::deleteRecursive(int nodePos, int key) {
 }
 
 /**
- * @brief deleteB com contração de raiz
+ * @brief Remoção e contração de raiz: após remover, se root ficar com n=0, adota único filho (ou zera).
+ * @param key Chave a remover.
+ * @return true se a chave existia no índice.
  */
 bool MWayTree::deleteB(int key) {
     if (!file.is_open() || root == 0) return false;
@@ -702,7 +736,12 @@ bool MWayTree::deleteB(int key) {
 }
 
 /**
- * @brief Verifica invariantes estruturais em todos os nós alcançáveis
+ * @brief Verifica invariantes estruturais em todos os nós alcançáveis a partir da raiz.
+ * @param verbose Se true, imprime diagnósticos detalhados no stdout.
+ * @return true se íntegro.
+ * @details Checa: header (n=-1, m válido); consistência de raiz; alcance via BFS;
+ *          ordenação estrita das chaves; limites de faixa por subárvore; ponteiros de filhos no intervalo [0..N];
+ *          mínimos por nó não-raiz (interno: >=minKeys, folha: >=1); ausência de nós órfãos.
  */
 bool MWayTree::verifyIntegrity(bool verbose) const {
     ifstream in(filename, ios::binary);

@@ -26,11 +26,21 @@ const vector<string> TEXT_FILES = {
     "mvias5.txt"
 };
 
+/**
+ * @brief Limpa estado de erro e descarta até o fim da linha no stdin.
+ */
 static void clearInputLine() {
     cin.clear();
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 }
 
+/**
+ * @brief Lê um inteiro no intervalo [minV..maxV] com re-prompt até validar.
+ * @param prompt Mensagem exibida.
+ * @param minV Valor mínimo aceito.
+ * @param maxV Valor máximo aceito.
+ * @return Inteiro validado.
+ */
 static int readIntInRange(const string& prompt, int minV, int maxV) {
     while (true) {
         cout << prompt;
@@ -48,6 +58,11 @@ static int readIntInRange(const string& prompt, int minV, int maxV) {
     }
 }
 
+/**
+ * @brief Lê qualquer inteiro com re-prompt até validar.
+ * @param prompt Mensagem exibida.
+ * @return Inteiro lido.
+ */
 static int readAnyInt(const string& prompt) {
     while (true) {
         cout << prompt;
@@ -62,6 +77,11 @@ static int readAnyInt(const string& prompt) {
     }
 }
 
+/**
+ * @brief Lê resposta 's' ou 'n' (case-insensitive) com re-prompt.
+ * @param prompt Mensagem exibida.
+ * @return 's' ou 'n'.
+ */
 static char readYesNo(const string& prompt) {
     while (true) {
         cout << prompt;
@@ -78,6 +98,11 @@ static char readYesNo(const string& prompt) {
     }
 }
 
+/**
+ * @brief Loop de busca por chave mostrando contadores de I/O de índice e dados.
+ * @param tree Árvore índice aberta.
+ * @param data Arquivo de dados aberto.
+ */
 void runSearchInterface(MWayTree& tree, DataFile& data) {
     while (true) {
         int key = readAnyInt("Chave de busca: ");
@@ -104,6 +129,10 @@ void runSearchInterface(MWayTree& tree, DataFile& data) {
     }
 }
 
+/**
+ * @brief Ponto de entrada: menu para criar/abrir índice e operar (buscar, inserir, remover, verificar).
+ * @return Código de retorno do processo (0 em sucesso).
+ */
 int main() {
     cout << "Selecione uma opcao de inicializacao:" << endl;
     cout << "1. Abrir indice existente (mvias.bin)" << endl;
@@ -168,7 +197,7 @@ int main() {
             ofstream d(dataPath, ios::binary | ios::trunc);
             d.close();
         }
-    } else { // init == 4
+    } else {
         order = readIntInRange(string("Informe a ordem m (3..") + to_string(MAX_M) + "): ", 3, MAX_M);
         std::filesystem::path empPath = cwd / "employees.txt";
         if (!std::filesystem::exists(empPath)) {
