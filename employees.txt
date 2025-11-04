@@ -1,0 +1,13 @@
+10;Alice;RH
+20;Bruno;Financeiro
+30;Carla;TI
+40;Davi;Marketing
+50;Eva;TI
+55;Filipe;TI
+60;Gabi;RH
+65;Hugo;Comercial
+70;Iris;TI
+75;Joao;Operacoes
+80;Karla;Marketing
+85;Leo;Financeiro
+
