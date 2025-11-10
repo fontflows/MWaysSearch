@@ -77,6 +77,20 @@ static int readAnyInt(const string& prompt) {
     }
 }
 
+static string readAnyString(const string& prompt) {
+    while(true) {
+        cout << prompt;
+        string s;
+        if (cin >> s) {
+            clearInputLine();
+            return s;
+        } else {
+            cout << "Entrada invalida. Tente novamente." << endl;
+            clearInputLine();
+        }
+    }
+}
+
 /**
  * @brief Lê resposta 's' ou 'n' (case-insensitive) com re-prompt.
  * @param prompt Mensagem exibida.
@@ -261,6 +275,8 @@ int main() {
             }
             case 2: {
                 int key = readAnyInt("Chave para inserir: ");
+                string name = readAnyString("Nome do funcionario: ");
+                string dept = readAnyString("Departamento: ");
 
                 Record rec{};
                 bool existsInData = data.find(key, rec);
@@ -272,8 +288,7 @@ int main() {
                 if (!existsInData) {
                     Record newRec{};
                     newRec.key = key;
-                    char dept = "ABCDE"[key % 5];
-                    std::snprintf(newRec.payload, sizeof(newRec.payload), "Funcionario %d | depto=%c", key, dept);
+                    std::snprintf(newRec.payload, sizeof(newRec.payload), "Funcionario %d | %s | %s", key, name.c_str(), dept.c_str());
                     data.insert(newRec);
                     auto [dR, dW] = data.getCounters();
                     cout << "I/O dados (insercao): R=" << dR << " W=" << dW << endl;
