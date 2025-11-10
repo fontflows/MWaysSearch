@@ -34,6 +34,13 @@ static void clearInputLine() {
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 }
 
+static string readLine(const string& prompt) {
+    cout << prompt;
+    string s;
+    getline(cin, s);
+    return s;
+}
+
 /**
  * @brief Lê um inteiro no intervalo [minV..maxV] com re-prompt até validar.
  * @param prompt Mensagem exibida.
@@ -152,6 +159,8 @@ int main() {
     int order = 3;
     string textFile;
 
+    bool employeesMode = (init == 4);
+
     if (init == 1) {
         if (!std::filesystem::exists(binPath)) {
             cout << "Indice inexistente. Crie primeiro pelo menu." << endl;
@@ -261,7 +270,6 @@ int main() {
             }
             case 2: {
                 int key = readAnyInt("Chave para inserir: ");
-
                 Record rec{};
                 bool existsInData = data.find(key, rec);
 
@@ -270,11 +278,18 @@ int main() {
                 cout << "I/O indice (insercao): R=" << iR << " W=" << iW << endl;
 
                 if (!existsInData) {
-                    Record newRec{};
-                    newRec.key = key;
-                    char dept = "ABCDE"[key % 5];
-                    std::snprintf(newRec.payload, sizeof(newRec.payload), "Funcionario %d | depto=%c", key, dept);
-                    data.insert(newRec);
+                    if (employeesMode) {
+                        string nome = readLine("Nome do funcionario: ");
+                        string depto = readLine("Departamento: ");
+                        data.insertEmployee(key, nome, depto);
+                    } else {
+                        Record newRec{};
+                        newRec.key = key;
+                        char dept = "ABCDE"[key % 5];
+                        std::snprintf(newRec.payload, sizeof(newRec.payload),
+                                      "Funcionario %d | depto=%c", key, dept);
+                        data.insert(newRec);
+                    }
                     auto [dR, dW] = data.getCounters();
                     cout << "I/O dados (insercao): R=" << dR << " W=" << dW << endl;
                 } else {

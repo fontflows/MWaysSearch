@@ -208,6 +208,25 @@ bool DataFile::insert(const Record& rec) {
 }
 
 /**
+ * @brief Insere funcionario (registro ativo) com montagem de payload "Funcionario id | Nome | Departamento".
+ * @param key Chave do funcionario.
+ * @param nome Nome do funcionario.
+ * @param depto Departamento do funcionario.
+ * @return true se escrita OK; contadores de I/O atualizados via insert().
+ */
+bool DataFile::insertEmployee(int key, const std::string& nome, const std::string& depto) {
+    Record r{};
+    r.key = key;
+    r.active = 1;
+    std::string payload = "Funcionario " + std::to_string(key) + " | " + nome + " | " + depto;
+    if (payload.size() >= sizeof(r.payload)) {
+        payload.resize(sizeof(r.payload) - 1);
+    }
+    std::snprintf(r.payload, sizeof(r.payload), "%s", payload.c_str());
+    return insert(r);
+}
+
+/**
  * @brief Marca como removido (active=0) o primeiro registro ativo com a chave.
  * @param key Chave a remover.
  * @return true se encontrou e marcou; counters são atualizados.

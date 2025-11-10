@@ -88,6 +88,15 @@ public:
     bool insert(const Record& rec);
 
     /**
+     * @brief Insere funcionario com nome/depto (monta payload).
+     * @param key Chave do funcionario.
+     * @param nome Nome do funcionario.
+     * @param depto Depto do funcionario.
+     * @return true se a escrita foi bem-sucedida.
+     */
+    bool insertEmployee(int key, const std::string& nome, const std::string& depto);
+
+    /**
      * @brief Remove logicamente (active=0) o primeiro registro ativo com a chave.
      * @param key Chave a remover.
      * @return true se encontrou e marcou como removido.
