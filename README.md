@@ -125,6 +125,26 @@ Após a inicialização, o programa exibe a árvore e oferece:
 
 ---
 
+## Impressão da árvore (BFS)
+
+A impressão percorre a árvore por níveis (BFS), pois fica mais direta de ler e checar:
+- Ordem: raiz → filhos da raiz → netos, e assim por diante.
+- Cada linha é um nó e segue: "No n,A[0],(K[1],A[1]),...,(K[n],A[n])", onde:
+  - No: posição lógica do nó no arquivo (1..N).
+  - n: quantidade de chaves do nó.
+  - A[i]: ponteiro do filho i (0..n), com A[0] sendo o mais à esquerda.
+  - K[i]: i-ésima chave do nó.
+- Leitura prática:
+  - Filhos de um nó aparecem nas linhas seguintes ao pai (no mesmo nível ou nos próximos).
+  - Nó folha: A[0] = 0 (na prática todos A[i] = 0).
+  - Estrutura de cada nó: A[0], K[1], A[1], K[2], A[2], ..., K[n], A[n].
+
+Por que manter BFS:
+- Facilita conferir ponteiros e comparar com arquivos de teste: ao ver um nó, seus filhos virão logo depois.
+- Ajuda na verificação de integridade por nível (mais simples de acompanhar).
+
+---
+
 ## Arquivos de Teste
 
 ### Árvores com m=3
